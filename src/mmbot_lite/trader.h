@@ -46,6 +46,9 @@ protected:
     Tick position = 0;
     Tick last_fill = 0;
 
+    Tick alert_buy = 0;
+    Tick alert_sell = 0;
+
 
     MarketCommand step(const MarketState &state);
 

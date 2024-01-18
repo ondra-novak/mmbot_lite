@@ -8,3 +8,12 @@ add_executable(mmbot_lite
      StrategyDCAM.cpp
      trader.cpp
 )
+
+add_executable(backtest
+     backtest.cpp
+     market_simulator.cpp
+     market_simulator_read_file.cpp
+     bollinger_spread.cpp
+     StrategyDCAM.cpp
+     trader.cpp
+)

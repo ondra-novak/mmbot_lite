@@ -4,15 +4,15 @@
 #include <iostream>
 #include <sstream>
 
+#include "numerics.h"
 
-int main() {
-    double a = 0;
-    double b = 0;
-    double c = 0;
-    long d = 0;
+#include <cmath>
+int main(int argc, char **argv) {
 
-    std::string s = "1 1.2  212.32 123";
-    std::istringstream ss(s);
-    ss >> a >> b >> c  >> d;
 
+    double z = mmbot::Numerics<>::find_root_to_inf(argc,[&](double x){
+        return 1e-85*std::cosh(200*(1-x))-0.01;
+    });
+
+    std::cout << z << std::endl;
 }

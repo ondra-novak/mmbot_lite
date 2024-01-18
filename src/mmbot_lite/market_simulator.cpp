@@ -14,9 +14,10 @@ void AbstractMarketSimulator::add_fill(PendingOrder &ord, const Time &tm) {
     state.position+=ord.size;
     double price = nfo.tick2price(ord.price);
     double size = nfo.lot2amount(ord.size);
-    acb = acb.execution(price, size*sd);
+    double fees = nfo.pct_fee*price*size;
+    acb = acb.execution(price, size*sd, fees);
     state.pending_orders.buy.reset();
-    fills.push_back(Fill{get_id(),tm,ord.price, ord.size,side,nfo.pct_fee*price*size});
+    fills.push_back(Fill{get_id(),tm,ord.price, ord.size,side, fees});
 }
 
 

@@ -31,15 +31,15 @@ public:
 	 *
 	 * Fee must be substracted. Effective price and size must be passed
 	 */
-	ACB execution(double price, double size) const {
+	ACB execution(double price, double size, double fees = 0) const {
 		ACB res;
 		if (pos * size >= 0) {
 			res.suma = suma + size * price;;
 			res.pos = pos + size;
-			res.rpnl = rpnl;
+			res.rpnl = rpnl - fees;
 		} else if (pos * (pos + size) < 0) {
 			double avg = suma/pos;
-			res.rpnl = rpnl + (price - avg) * pos;
+			res.rpnl = rpnl + (price - avg) * pos - fees;
 			size += pos;
 			res.pos = 0;
 			res.suma = 0;
@@ -49,7 +49,7 @@ public:
 				size = -pos; //solve rounding errors
 			}
 			double avg = suma/pos;
-			res.rpnl = rpnl - (price - avg) * size;
+			res.rpnl = rpnl - (price - avg) * size - fees;
 			res.pos = pos + size;
 			res.suma = avg * res.pos;
 		}

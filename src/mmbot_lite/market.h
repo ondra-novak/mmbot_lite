@@ -44,13 +44,21 @@ struct MarketInfo {
         return std::max(min_size, static_cast<Lot>(minsz/lot_size)+1);
     }
 
-    constexpr double calc_pnl(Tick open, Tick close, Lot amount) {
+    constexpr double calc_pnl(Tick open, Tick close, Lot amount) const {
         if (inverted) {
             return -(1.0/tick2price(open)+1.0/tick2price(close))*lot2amount(amount);
         } else {
             return (tick2price(close)-tick2price(open))*lot2amount(amount);
         }
     }
+    constexpr double calc_fee(Tick price, Lot amount) const {
+        return std::abs(tick2price(price) * lot2amount(amount)) * pct_fee;
+    }
+    constexpr double position(Lot pos) const {
+        if (inverted) return -lot2amount(pos);
+        else return lot2amount(pos);
+    }
+
 };
 
 using OrderID = std::string;
