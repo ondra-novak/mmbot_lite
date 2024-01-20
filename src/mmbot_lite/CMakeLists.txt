@@ -16,4 +16,5 @@ add_executable(backtest
      bollinger_spread.cpp
      StrategyDCAM.cpp
      trader.cpp
+     reporting_csv.cpp
 )

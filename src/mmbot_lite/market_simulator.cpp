@@ -10,8 +10,8 @@ AbstractMarketSimulator::AbstractMarketSimulator(const MarketInfo &nfo, double e
 
 template<Side side>
 void AbstractMarketSimulator::add_fill(PendingOrder &ord, const Time &tm) {
-    constexpr double sd = side == Side::buy?1:-1;
-    state.position+=ord.size;
+    constexpr double sd = static_cast<double>(side);
+    state.position+=ord.size*static_cast<Lot>(side);
     double price = nfo.tick2price(ord.price);
     double size = nfo.lot2amount(ord.size);
     double fees = nfo.pct_fee*price*size;
@@ -67,7 +67,7 @@ const MarketState& AbstractMarketSimulator::get_state()  {
     state.bid = src.bid;
     state.tp = src.tm;
     state.market_rev = nfo.rev;
-    state.equity = acb.getRPnL();
+    state.equity = acb.getEquity(nfo.tick2price((src.ask+src.bid)>>1));
     state.open_price = acb.getOpen();
     state.fills = fills;
     fills.clear();

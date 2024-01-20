@@ -2,8 +2,11 @@
 
 #include <string>
 #include <chrono>
+#include <cmath>
 #include <optional>
 #include <vector>
+
+#include "acb.h"
 
 namespace mmbot {
 
@@ -11,6 +14,12 @@ using Tick = long;
 using Lot = long;
 using Revision = unsigned long;
 
+
+
+enum class Side: int {
+    buy = 1,
+    sell = -1
+};
 
 struct MarketInfo {
     //revision of this information. If revision changes, you know, that you need to update info
@@ -38,35 +47,50 @@ struct MarketInfo {
     constexpr double lot2amount(Lot lot) const {
         return lot * lot_size;
     }
-    constexpr Lot min_lot(Tick at_price) const {
-        double price = tick2price(at_price);
-        double minsz = min_volume/price;
-        return std::max(min_size, static_cast<Lot>(minsz/lot_size)+1);
+    constexpr Lot get_min_lot(Tick at_price) const {
+        return amount2lot(get_min_size(tick2price(at_price)));
     }
 
-    constexpr double calc_pnl(Tick open, Tick close, Lot amount) const {
+    constexpr double get_min_size(double at_price) const {
+        double minsz;
         if (inverted) {
-            return -(1.0/tick2price(open)+1.0/tick2price(close))*lot2amount(amount);
+            minsz = min_volume*at_price;
         } else {
-            return (tick2price(close)-tick2price(open))*lot2amount(amount);
+            minsz = min_volume/at_price;
+        }
+        return ceil(std::max(min_size*lot_size, minsz)/lot_size)*lot_size;
+
+    }
+
+    constexpr double calc_pnl(double open, double close, double amount) const {
+        if (inverted) {
+            return -(1.0/open+1.0/close)*amount;
+        } else {
+            return (close-open)*amount;
         }
     }
-    constexpr double calc_fee(Tick price, Lot amount) const {
-        return std::abs(tick2price(price) * lot2amount(amount)) * pct_fee;
+    ACB update_acb(const ACB &acb, Tick price, Lot amount, Side side, double fee) const {
+        if (inverted) {
+            return acb.execution(1.0/tick2price(price), -static_cast<double>(side)*lot2amount(amount), fee);
+        } else {
+            return acb.execution(tick2price(price), static_cast<double>(side)*lot2amount(amount), fee);
+        }
     }
-    constexpr double position(Lot pos) const {
-        if (inverted) return -lot2amount(pos);
-        else return lot2amount(pos);
+
+    double acb_get_open(const ACB &acb) {
+        if (inverted) return 1.0/acb.getOpen(); else return acb.getOpen();
+    }
+    double acb_get_position(const ACB &acb) {
+        if (inverted) return -acb.getPos(); else return acb.getPos();
+    }
+    double acb_get_upnl(const ACB &acb, Tick price) {
+        double p = inverted?1.0/tick2price(price):tick2price(price);
+        return acb.getUPnL(p);
     }
 
 };
 
 using OrderID = std::string;
-
-enum class Side: int {
-    buy = 1,
-    sell = -1
-};
 
 struct PendingOrder {
     OrderID id;

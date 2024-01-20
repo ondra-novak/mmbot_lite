@@ -3,8 +3,9 @@
 #include "bollinger_spread.h"
 namespace mmbot {
 
-Trader::Trader(const Config &cfg, PMarket market)
+Trader::Trader(const Config &cfg, PMarket market, PReport rpt)
            :market(std::move(market))
+           ,rpt(std::move(rpt))
 {
 
     PSpread spread (new BollingerSpread(
@@ -19,22 +20,27 @@ Trader::Trader(const Config &cfg, PMarket market)
 
 void Trader::start() {
     minfo = market->get_info();
+    rpt->rpt(minfo);
     const MarketState &st = market->get_state();
+    rpt->rpt(st);
     last = (st.ask + st.bid) / 2;
-    last_fill = last;
+    last_fill = minfo.tick2price(last);
     if (std::isfinite(st.open_price)) {
         last_fill = minfo.price2tick(st.open_price);
     }
     position = st.position;
     strategy->start(process_state(st), std::move(spreadState));
     auto cmd = step(st);
+    rpt->rpt(cmd);
     market->execute(cmd);
 
 }
 
 void Trader::step() {
     const MarketState &st = market->get_state();
+    rpt->rpt(st);
     auto cmd = step(st);
+    rpt->rpt(cmd);
     market->execute(cmd);
 }
 
@@ -78,7 +84,9 @@ static void setOrder(const MarketInfo &minfo,
 
 MarketCommand Trader::step(const MarketState &state) {
 
-    StrategyMarketCommand mcmd = strategy->step(process_state(state));
+    StrategyResult mcmd = strategy->step(process_state(state));
+
+    rpt->rpt(mcmd);
 
     MarketCommand ret;
     ret.allocate = mcmd.allocate;
@@ -88,6 +96,15 @@ MarketCommand Trader::step(const MarketState &state) {
 
     setOrder<-1>(minfo, mcmd.buy, alert_buy, ret.buy, state.ask);
     setOrder<1>(minfo, mcmd.sell, alert_sell, ret.sell, state.bid);
+
+    rpt->rpt(TraderReport{
+        pnl.getRPnL(), minfo.acb_get_upnl(pnl, last),
+        minfo.acb_get_position(pnl),
+        minfo.acb_get_open(pnl),
+        std::abs(pnl.getSuma())
+
+    });
+
     return ret;
 
 
@@ -97,45 +114,50 @@ MarketCommand Trader::step(const MarketState &state) {
 StrategyMarketState Trader::process_state(const MarketState &state) {
     StrategyMarketState ret = {};
     last = std::max(state.bid, std::min(state.ask, last));
+    ret.minfo = &minfo;
     ret.ask = minfo.tick2price(state.ask);
     ret.bid = minfo.tick2price(state.bid);
     ret.last = minfo.tick2price(last);
+    ret.prev_exec_price = last_fill;
+    ret.prev_position =  position;
 
     if (!state.fills.empty()) {
-        double fees =0;
-        double pnl = 0;
+        ACB total_fill;
         for (const Fill &f: state.fills) {
-            double p = minfo.calc_pnl(last_fill, f.price, position);
-            pnl += p;
-            fees += f.fee;
-            if (f.side == Side::buy) position += f.size; else position -= f.size;
-            last_fill = f.price;
-
+            total_fill = minfo.update_acb(total_fill, f.price, f.size, f.side, f.fee);
+            pnl = minfo.update_acb(pnl, f.price, f.size, f.side, f.fee);
         }
+        double fill_price = minfo.acb_get_open(total_fill);
+        double fees = -total_fill.getRPnL();
+        double pnl = minfo.calc_pnl(last_fill, fill_price, position);
+        last_fill = fill_price;
         ret.execution = true;
         ret.pnl = pnl - fees;
+        position = this->pnl.getPos();
     } else {
 
         if (alert_sell && state.bid > alert_sell) {
-            ret.pnl =  minfo.calc_pnl(last_fill, alert_sell, position);
+            double aprice = minfo.tick2price(alert_sell);
+            ret.pnl =  minfo.calc_pnl(last_fill, aprice, position);
             ret.alert = true;
-            ret.last_exec_price = alert_sell;
+            last_fill = aprice;
             ret.position = position;
             alert_sell = 0;
         } else if (state.ask < alert_buy) {
-            ret.pnl =  minfo.calc_pnl(last_fill, alert_buy, position);
+            double aprice = minfo.tick2price(alert_buy);
+            ret.pnl =  minfo.calc_pnl(last_fill, aprice, position);
             ret.alert = true;
-            ret.last_exec_price = alert_buy;
+            last_fill = aprice;
             ret.position = position;
             alert_sell = 0;
         } else {
-            ret.pnl = minfo.calc_pnl(last_fill, last, position);
+            ret.pnl = minfo.calc_pnl(last_fill, minfo.tick2price(last), position);
         }
-        ret.pnl -= minfo.calc_fee(last_fill, position);
+        ret.pnl -= (minfo.inverted?std::abs(position):last_fill*std::abs(position))*minfo.pct_fee;
     }
-    ret.min_size = minfo.lot2amount(minfo.min_lot(last));
-    ret.last_exec_price = minfo.tick2price(last_fill);
-    ret.position = minfo.position(position);
+    ret.last_exec_price = last_fill;
+    ret.position = position;
+    ret.cost = std::abs(pnl.getSuma());
     return ret;
 }
 
