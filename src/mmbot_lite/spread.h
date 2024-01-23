@@ -7,46 +7,6 @@
 
 namespace mmbot {
 
-class ISpreadState {
-public:
-
-	virtual ~ISpreadState() {}
-	virtual ISpreadState *clone() const = 0;
-
-};
-
-
-class ISpreadFunction {
-public:
-
-	struct Result {
-		bool valid = false;
-		double spread = 0;
-		double center = 0;
-		int trend = 0;
-	};
-
-	virtual clone_ptr<ISpreadState> start() const = 0;
-	virtual ISpreadFunction *clone() const = 0;
-	virtual Result point(std::unique_ptr<ISpreadState> &state, double y) const = 0;
-	virtual ~ISpreadFunction() {}
-};
-
-
-std::unique_ptr<ISpreadFunction> defaultSpreadFunction(
-		double sma,
-		double stdev,
-		double force_spread);
-std::unique_ptr<ISpreadFunction> defaultSpreadFunction_direct(
-        unsigned int sma,
-        unsigned int stdev,
-        double force_spread);
-
-struct SpreadStats {
-    double spread;
-    double mult_buy;
-    double mult_sell;
-};
 
 class ISpreadGen {
 public:
@@ -81,9 +41,48 @@ public:
 
     virtual ISpreadGen *clone() const = 0;
 
-    virtual SpreadStats get_stats(PState &state, double equilibrium) const = 0;
 };
 
+
+class ISpread {
+public:
+
+    enum class Flag {
+        ///normal price
+        normal,
+        ///middle price - (we are at middle of pattern)
+        middle,
+        ///edge price - (we are at edge of pattern)
+        edge
+    };
+
+    struct Result {
+        std::optional<double> buy;
+        std::optional<double> sell;
+        Flag buy_flag;
+        Flag sell_flag;
+
+    };
+
+    ///Retrieve current result
+    virtual Result get_result(double equilibrium) const = 0;
+    ///Put starting point
+    /**
+     * It resets state and puts starting point
+     * @param y point value
+     */
+    virtual void start(double y) = 0;
+    ///Add normal point
+    virtual void point(double y) = 0;
+    ///Add execution point
+    virtual void execution(double y) = 0;
+    ///Retrieve minimal count of points to return usable result
+    virtual unsigned int get_min_point_count() const = 0;
+
+    virtual ISpread *clone() const = 0;
+
+    virtual ~ISpread() = default;
+};
 
 
 }

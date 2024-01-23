@@ -11,7 +11,7 @@ ReportingCSV::ReportingCSV(std::string ofile) {
     if (!output) throw std::runtime_error("Failed to open report for writing");
     output << "time,bid,ask,equity,open_price,position,fill_price,fill_size,fill_fee,"
              "buy_price,buy_size,sell_price,sell_size,"
-            "allocated,neutral,rpnl,upnl,cost,leverage" << std::endl;
+            "allocated,neutral,loss,rpnl,upnl,cost,leverage" << std::endl;
 }
 
 
@@ -90,9 +90,10 @@ void ReportingCSV::add_to_report() {
     }
     if (strategy_output) {
         output << "," << sr.allocate <<",";
-        if (sr.neutral_price) output << sr.neutral_price;
+        output << sr.neutral_price;
+        output << "," << sr.loss;
     } else {
-        output << ",,";
+        output << ",,,";
     }
     if (trader_output) {
         output << "," << trpt.rpnl << "," << trpt.rpnl+trpt.upnl

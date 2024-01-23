@@ -50,6 +50,9 @@ const MarketState& AbstractMarketSimulator::get_state()  {
 
     if (state.pending_orders.buy) {
         PendingOrder &ord = *state.pending_orders.buy;
+        if (ord.price == 0) {
+            ord.price = src.ask;
+        }
         if (ord.price >= src.ask) {
             add_fill<Side::buy>(ord, src.tm);
             state.pending_orders.buy.reset();
@@ -57,6 +60,9 @@ const MarketState& AbstractMarketSimulator::get_state()  {
     }
     if (state.pending_orders.sell) {
         PendingOrder &ord = *state.pending_orders.sell;
+        if (ord.price == 0) {
+            ord.price = src.bid;
+        }
         if (ord.price <= src.bid) {
             add_fill<Side::sell>(ord, src.tm);
             state.pending_orders.sell.reset();

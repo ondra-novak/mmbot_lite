@@ -3,19 +3,13 @@
 #include "bollinger_spread.h"
 namespace mmbot {
 
-Trader::Trader(const Config &cfg, PMarket market, PReport rpt)
-           :market(std::move(market))
-           ,rpt(std::move(rpt))
+Trader::Trader(Config cfg, PMarket market, PReport rpt)
+            :strategy(std::move(cfg.strategy))
+            ,spread(std::move(cfg.spread))
+            ,market(std::move(market))
+            ,rpt(std::move(rpt))
 {
 
-    PSpread spread (new BollingerSpread(
-            cfg.spread.mean_points,
-            cfg.spread.stdev_points,
-            cfg.spread.curves,
-            cfg.spread.zero_line
-    ));
-    spreadState = spread->start();
-    strategy.emplace(cfg.strategy, std::move(spread));
 }
 
 void Trader::start() {
@@ -23,142 +17,137 @@ void Trader::start() {
     rpt->rpt(minfo);
     const MarketState &st = market->get_state();
     rpt->rpt(st);
-    last = (st.ask + st.bid) / 2;
-    last_fill = minfo.tick2price(last);
-    if (std::isfinite(st.open_price)) {
-        last_fill = minfo.price2tick(st.open_price);
-    }
-    position = st.position;
-    strategy->start(process_state(st), std::move(spreadState));
-    auto cmd = step(st);
-    rpt->rpt(cmd);
-    market->execute(cmd);
-
+    auto &ss = process_state(st);
+    spread->start(ss.current_price);
+    strategy->start(ss);
+    execute_state(ss, st);
 }
 
 void Trader::step() {
-    const MarketState &st = market->get_state();
-    rpt->rpt(st);
-    auto cmd = step(st);
-    rpt->rpt(cmd);
-    market->execute(cmd);
-}
-
-template<int dir>
-static void setOrder(const MarketInfo &minfo,
-        const StrategyOrder &srcOrder,
-        Tick &alert,
-        std::optional<MarketCommand::Order> &trgOrder,
-        Tick askbid) {
-
-    if (srcOrder.size == srcOrder.alert) {
-        if (srcOrder.price) {
-            alert = minfo.price2tick(srcOrder.price);
-        }
-    } else if (srcOrder.size > 0) {
-        Lot amount = minfo.amount2lot(srcOrder.size);
-        if (amount > 0) {
-            if (srcOrder.price) {
-                Tick t = minfo.price2tick(srcOrder.price);
-                if constexpr(dir < 0) {
-                    t = std::min(t, askbid-1);
-                } else {
-                    t = std::max(t, askbid+1);
-                }
-                trgOrder.emplace(MarketCommand::Order{
-                    t,
-                    amount,
-                    true
-                });
-            } else {
-                trgOrder.emplace(MarketCommand::Order{
-                    askbid,
-                    amount,
-                    false
-                });
+    int att = 1;
+    while (true) {
+        const MarketState &st = market->get_state();
+        if (st.market_rev != minfo.rev) {
+            minfo = market->get_info();
+            if (minfo.rev != st.market_rev) {
+                if (++att>10) break;
+                continue;
             }
         }
+        auto &ss = process_state(st);
+        strategy->event(ss);
+        execute_state(ss, st);
+        return;
     }
-
+    throw std::runtime_error("Failed to update market information consistently (revision mistmatch)");
 }
 
-MarketCommand Trader::step(const MarketState &state) {
+StrategyState &Trader::process_state(const MarketState &state) {
+    StrategyState &ss = strategy_state;
+    ss.current_time = state.tp;
+    ss.current_price = minfo.tick2price((state.ask+state.bid)/2);
+    ss.min_size = std::max(minfo.lot2amount(minfo.min_size), minfo.min_volume/ss.current_price);
+    ss.leverage = minfo.leverage;
 
-    StrategyResult mcmd = strategy->step(process_state(state));
-
-    rpt->rpt(mcmd);
-
-    MarketCommand ret;
-    ret.allocate = mcmd.allocate;
-
-    alert_buy = 0;
-    alert_sell = 0;
-
-    setOrder<-1>(minfo, mcmd.buy, alert_buy, ret.buy, state.ask);
-    setOrder<1>(minfo, mcmd.sell, alert_sell, ret.sell, state.bid);
-
-    rpt->rpt(TraderReport{
-        pnl.getRPnL(), minfo.acb_get_upnl(pnl, last),
-        minfo.acb_get_position(pnl),
-        minfo.acb_get_open(pnl),
-        std::abs(pnl.getSuma())
-
-    });
-
-    return ret;
-
-
-
-}
-
-StrategyMarketState Trader::process_state(const MarketState &state) {
-    StrategyMarketState ret = {};
-    last = std::max(state.bid, std::min(state.ask, last));
-    ret.minfo = &minfo;
-    ret.ask = minfo.tick2price(state.ask);
-    ret.bid = minfo.tick2price(state.bid);
-    ret.last = minfo.tick2price(last);
-    ret.prev_exec_price = last_fill;
-    ret.prev_position =  position;
+    auto [bid,ask] = minfo.tick2price({state.bid, state.ask});
 
     if (!state.fills.empty()) {
         ACB total_fill;
         for (const Fill &f: state.fills) {
-            total_fill = minfo.update_acb(total_fill, f.price, f.size, f.side, f.fee);
-            pnl = minfo.update_acb(pnl, f.price, f.size, f.side, f.fee);
-        }
-        double fill_price = minfo.acb_get_open(total_fill);
-        double fees = -total_fill.getRPnL();
-        double pnl = minfo.calc_pnl(last_fill, fill_price, position);
-        last_fill = fill_price;
-        ret.execution = true;
-        ret.pnl = pnl - fees;
-        position = this->pnl.getPos();
-    } else {
+            double price = minfo.tick2price(f.price);
+            double size = minfo.lot2amount(f.size) * static_cast<double>(f.side);
 
+            total_fill = total_fill.execution(price, size, f.fee);
+        }
+        double fill_price = total_fill.getOpen();
+        double fees = total_fill.getRPnL();
+        double fill_size = total_fill.getPos();
+        double feepct = fees/(fill_price*fill_size);
+        double adj_price = fill_price - fill_price * feepct;
+
+        ss.last_exec_price = adj_price;
+        ss.last_exec_change = fill_size;
+        ss.position += fill_size;
+        ss.execution = true;
+    } else {
+        ss.execution = false;
         if (alert_sell && state.bid > alert_sell) {
             double aprice = minfo.tick2price(alert_sell);
-            ret.pnl =  minfo.calc_pnl(last_fill, aprice, position);
-            ret.alert = true;
-            last_fill = aprice;
-            ret.position = position;
+            ss.last_exec_price = aprice;
+            ss.alert = true;
             alert_sell = 0;
         } else if (state.ask < alert_buy) {
             double aprice = minfo.tick2price(alert_buy);
-            ret.pnl =  minfo.calc_pnl(last_fill, aprice, position);
-            ret.alert = true;
-            last_fill = aprice;
-            ret.position = position;
-            alert_sell = 0;
+            ss.last_exec_price = aprice;
+            ss.alert = true;
+            alert_buy = 0;
         } else {
-            ret.pnl = minfo.calc_pnl(last_fill, minfo.tick2price(last), position);
+            ss.alert = false;
         }
-        ret.pnl -= (minfo.inverted?std::abs(position):last_fill*std::abs(position))*minfo.pct_fee;
+
     }
-    ret.last_exec_price = last_fill;
-    ret.position = position;
-    ret.cost = std::abs(pnl.getSuma());
-    return ret;
+    ss.buy.reset();
+    ss.sell.reset();
+    if (ss.execution || ss.alert) {
+        spread->execution(ss.last_exec_price);
+        spread->point(ss.current_price);
+    } else {
+        double eq = ss.equilibrium?ss.equilibrium:ss.last_exec_price;
+        spread->point(ss.current_price);
+        auto sres = spread->get_result(eq);
+        if (sres.buy.has_value()) {
+            ss.buy.emplace(StrategyState::Order{*sres.buy*(1+minfo.pct_fee)});
+        }
+        if (sres.sell.has_value()) {
+            ss.sell.emplace(StrategyState::Order{*sres.sell*(1-minfo.pct_fee)});
+        }
+        ss.buy_flag = sres.buy_flag;
+        ss.sell_flag = sres.sell_flag;
+        if (ss.buy.has_value() && ss.sell.has_value() && ss.buy->price >= ss.sell->price) {
+            ss.buy.reset();
+            ss.sell.reset();
+        }
+    }
+    return ss;
+}
+
+void Trader::execute_state(const StrategyState &st, const MarketState &state) {
+    MarketCommand cmd;
+    alert_buy = alert_sell = 0;
+    if (st.buy.has_value()) {
+        Tick tick =  minfo.price2tick(st.buy->price / (1+minfo.pct_fee));
+        Lot lot = minfo.lot2amount(st.buy->size);
+        if (tick >= state.ask) tick = state.ask-1;
+        if (lot) {
+            cmd.buy.emplace(MarketCommand::Order{tick,lot,true});
+        } else {
+            alert_buy = tick;
+        }
+    }
+    if (st.sell.has_value()) {
+        Tick tick =  minfo.price2tick(st.sell->price / (1-minfo.pct_fee));
+        Lot lot = minfo.lot2amount(st.sell->size);
+        if (tick <= state.bid) tick = state.bid-1;
+        if (lot) {
+            cmd.sell.emplace(MarketCommand::Order{tick,lot,true});
+        } else {
+            alert_sell = tick;
+        }
+    }
+    if (st.market_order > 0) {
+        Lot lot = minfo.lot2amount(st.market_order);
+        if (lot) {
+            cmd.buy.emplace(MarketCommand::Order{0,lot,false});
+        }
+    }
+    if (st.market_order < 0) {
+        Lot lot = minfo.lot2amount(-st.market_order);
+        if (lot) {
+            cmd.sell.emplace(MarketCommand::Order{0,lot,false});
+        }
+    }
+    cmd.allocate = st.allocation;
+    market->execute(cmd);
 }
 
 }

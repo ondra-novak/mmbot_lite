@@ -2,27 +2,16 @@
 
 namespace mmbot {
 
-
-
-BollingerSpread::BollingerSpread(unsigned int mean_points,
-        unsigned int stdev_points, std::vector<double> curves,
-        bool zero_line)
-:_mean_points(mean_points)
-,_stdev_points(stdev_points)
-,_curves(std::move(curves))
-,_zero_line(zero_line)
-{
-
-
+BBSpread::BBSpread(Config cfg):BBSpread(init(cfg)) {
 }
 
-ISpreadGen::PState BollingerSpread::start() const {
+BBSpread BBSpread::init(const Config &cfg) {
     std::vector<double> c;
-    if (_curves.empty()) {
+    if (cfg.levels.empty()) {
         c.push_back(1.0);
         c.push_back(-1.0);
     } else {
-        for (double d : _curves) {
+        for (double d : cfg.levels) {
             if (d > 0) {
                 c.push_back(d);
                 c.push_back(-d);
@@ -30,32 +19,28 @@ ISpreadGen::PState BollingerSpread::start() const {
         }
     }
 
-    if (_zero_line) c.push_back(0.0);
+    if (cfg.zero_level) c.push_back(0.0);
     std::sort(c.begin(), c.end());
-    return PState(new State(c, EMStDev(_mean_points, _stdev_points)));
+    return BBSpread(std::move(c), EMStDev(cfg.mean_points, cfg.stdev_points), std::max(cfg.mean_points, cfg.stdev_points));
+
 }
 
-ISpreadGen* BollingerSpread::clone() const {
-    return new BollingerSpread(*this);
+void BBSpread::point(double y) {
+    _stdev += y;
+    auto nxb = next_buy(_buy_curve);
+    if (_stdev(*nxb) < y) _buy_curve = nxb;
+
+    auto nxs = next_sell(_sell_curve);
+    if (_stdev(*nxs) > y) _sell_curve = nxs;
+
 }
 
-ISpreadGen::State* BollingerSpread::State::clone() const {
-    return new State(*this);
-}
-
-BollingerSpread::State& BollingerSpread::get_state(PState &st) {
-    return static_cast<State &>(*st);
-}
-
-ISpreadGen::Result BollingerSpread::get_result(const ISpreadGen::PState &state, double equilibrium) const {
-    const State &st = get_state(state);
+ISpread::Result BBSpread::get_result(double equilibrium) const {
     Result r;
-    if (!st._inited) return r;
-
     {
-        auto iter = st._buy_curve;
-        while (!st.below(iter)) {
-            auto b = st._stdev(*iter);
+        auto iter = _buy_curve;
+        while (!below(iter)) {
+            auto b = _stdev(*iter);
             if (b < equilibrium) {
                 r.buy = b;
                 break;
@@ -65,9 +50,9 @@ ISpreadGen::Result BollingerSpread::get_result(const ISpreadGen::PState &state, 
     }
 
     {
-        auto iter = st._sell_curve;
-        while (!st.above(iter)) {
-            auto s = st._stdev(*iter);
+        auto iter = _sell_curve;
+        while (!above(iter)) {
+            auto s = _stdev(*iter);
             if (s > equilibrium) {
                 r.sell = s;
                 break;
@@ -79,134 +64,41 @@ ISpreadGen::Result BollingerSpread::get_result(const ISpreadGen::PState &state, 
 }
 
 
-void BollingerSpread::point(ISpreadGen::PState &state, double y,
-        bool execution) const {
-    State &st = get_state(state);
-    if (st._inited) {
-        if (execution) {
-
-            auto near = st._disabled_curve;
-            double best = std::numeric_limits<double>::max();
-            for (const auto &c: st._curves) {
-                if (&c == st._disabled_curve) continue;
-                double p = st._stdev(c);
-                double dist = std::abs(p - y);
-                if (dist < best) {
-                    best = dist;
-                    near = &c;
-                }
-            }
-
-            st._disabled_curve = &(*near);
-            st._buy_curve = &(*near)-1;
-            st._sell_curve = &(*near)+1;
-
-        } else {
-            st._stdev += y;
-            auto nxb = st.next_buy(st._buy_curve);
-            if (st._stdev(*nxb) < y) st._buy_curve = nxb;
-
-            auto nxs = st.next_sell(st._sell_curve);
-            if (st._stdev(*nxs) > y) st._sell_curve = nxs;
-
+void BBSpread::execution(double y) {
+    auto near = _disabled_curve;
+    double best = std::numeric_limits<double>::max();
+    for (const auto &c: _curves) {
+        if (&c == _disabled_curve) continue;
+        double p = _stdev(c);
+        double dist = std::abs(p - y);
+        if (dist < best) {
+            best = dist;
+            near = &c;
         }
+    }
+
+    _disabled_curve = &(*near);
+    _buy_curve = &(*near)-1;
+    _sell_curve = &(*near)+1;
+}
+
+unsigned int BBSpread::get_min_point_count() const {
+    return _min_period;
+}
+
+void BBSpread::start(double y) {
+    _stdev.set_initial(y, 0.01*y);
+    auto init = std::lower_bound(_curves.begin(), _curves.end(), 0.0);
+    if (init == _curves.end()) {
+        _disabled_curve = &_curves.back();
     } else {
-        st._stdev.set_initial(y, 0.01*y);
-        auto init = std::lower_bound(st._curves.begin(), st._curves.end(), 0.0);
-        if (init == st._curves.end()) {
-            st._disabled_curve = &st._curves.back();
-        } else {
-            st._disabled_curve = &(*init);
-        }
-        st._buy_curve = &st._curves.front();
-        st._sell_curve = &st._curves.back();
-        st._inited = true;
+        _disabled_curve = &(*init);
     }
-
-/*
-    *st.debug << (execution?"X":"-") << "," << *st._disabled_curve << "," << y << ",";
-    if (st.at_end(st._buy_curve)) *st.debug << "---"; else *st.debug << *st._buy_curve;
-    *st.debug << ",";
-    if (st.at_end(st._sell_curve)) *st.debug << "---"; else *st.debug << *st._sell_curve;
-    for (auto x: st._curves) *st.debug << "," << st._stdev(x);
-    *st.debug << std::endl;
-*/
-}
-
-unsigned int BollingerSpread::get_required_history_length() const {
-    return std::max(_mean_points, _stdev_points);
-}
-
-SpreadStats BollingerSpread::get_stats(ISpreadGen::PState &state, double equilibrium) const {
-    const State &st = get_state(state);
-    SpreadStats out;
-    out.mult_buy = -std::numeric_limits<double>::infinity();
-    out.mult_sell = std::numeric_limits<double>::infinity();
-    out.spread = 0;
-    if (!st._inited) return out;
-
-    out.spread = st._stdev.get_stdev()/st._stdev.get_mean();
-     {
-         auto iter = st._buy_curve;
-         while (!st.below(iter)) {
-             auto b = st._stdev(*iter);
-             if (b < equilibrium) {
-                 out.mult_buy = *iter;
-                 break;
-             }
-             --iter;
-         }
-     }
-
-     {
-         auto iter = st._sell_curve;
-         while (!st.above(iter)) {
-             auto s = st._stdev(*iter);
-             if (s > equilibrium) {
-                 out.mult_sell = *iter;
-                 break;
-             }
-             ++iter;
-         }
-     }
-     return out;
-}
-
-const BollingerSpread::State& BollingerSpread::get_state(const PState &st) {
-    return static_cast<const State &>(*st);
+    _buy_curve = &_curves.front();
+    _sell_curve = &_curves.back();
 }
 
 
 
-
-BollingerSpread::State::Iter BollingerSpread::State::next_buy(Iter x) const {
-    if (x == &_curves.back()) return x;
-    auto a = x;
-    ++a;
-    if (a == _disabled_curve) {
-        if (a == &_curves.back()) return x;
-        ++a;
-    }
-    return a;
-}
-
-BollingerSpread::State::Iter BollingerSpread::State::next_sell(Iter x) const {
-    if (x == &_curves.front()) return x;
-    auto a = x;
-    --a;
-    if (a == _disabled_curve) {
-        if (a == &_curves.front()) return x;
-        --a;
-    }
-    return a;
-}
-
-bool BollingerSpread::State::below(Iter x) const {
-    return x < &_curves.front();
-}
-
-bool BollingerSpread::State::above(Iter x) const {
-    return x > &_curves.back();
-}
 
 }

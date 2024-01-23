@@ -5,6 +5,12 @@
 namespace mmbot {
 
 
+template<typename T, typename Q>
+requires (std::is_arithmetic_v<T> && std::is_arithmetic_v<Q>)
+constexpr T sign(const Q &q) {
+    return q>Q{}?static_cast<T>(1):q<Q{}?static_cast<T>(-1):T{};
+}
+
 template<unsigned int iterations = 30>
 class Numerics {
 public:

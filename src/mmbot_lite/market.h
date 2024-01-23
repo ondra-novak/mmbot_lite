@@ -8,6 +8,7 @@
 
 #include "acb.h"
 
+#include <tuple>
 namespace mmbot {
 
 using Tick = long;
@@ -30,62 +31,53 @@ struct MarketInfo {
     double min_volume;
     double pct_fee;
     Lot min_size;
-    bool inverted;
 
 
     constexpr Tick price2tick(double price) const {
         double adj = price>0?0.5:-0.5;
         return static_cast<Tick>((price+tick_size*adj)/tick_size);
     }
+
+    template<unsigned int n>
+    auto price2tick(const double (&arr)[n]) const {
+        return [&]<std::size_t... idx>(std::index_sequence<idx...>) {
+            return std::make_tuple(price2tick(arr[idx]) ...);
+        }(std::make_index_sequence<n>());
+    }
+
     constexpr double tick2price(Tick tick) const {
         return tick * tick_size;
     }
+
+    template<unsigned int n>
+    auto tick2price(const Tick (&arr)[n]) const {
+        return [&]<std::size_t... idx>(std::index_sequence<idx...>) {
+            return std::make_tuple(tick2price(arr[idx]) ...);
+        }(std::make_index_sequence<n>());
+    }
+
     constexpr Lot amount2lot(double amount) const {
         double adj = amount>0?0.5:-0.5;
         return static_cast<Lot>((amount+lot_size*adj)/lot_size);
     }
+
+    template<unsigned int n>
+    auto amount2lot(const double (&arr)[n]) const {
+        return [&]<std::size_t... idx>(std::index_sequence<idx...>) {
+            return std::make_tuple(amount2lot(arr[idx]) ...);
+        }(std::make_index_sequence<n>());
+    }
+
+
     constexpr double lot2amount(Lot lot) const {
         return lot * lot_size;
     }
-    constexpr Lot get_min_lot(Tick at_price) const {
-        return amount2lot(get_min_size(tick2price(at_price)));
-    }
 
-    constexpr double get_min_size(double at_price) const {
-        double minsz;
-        if (inverted) {
-            minsz = min_volume*at_price;
-        } else {
-            minsz = min_volume/at_price;
-        }
-        return ceil(std::max(min_size*lot_size, minsz)/lot_size)*lot_size;
-
-    }
-
-    constexpr double calc_pnl(double open, double close, double amount) const {
-        if (inverted) {
-            return -(1.0/open+1.0/close)*amount;
-        } else {
-            return (close-open)*amount;
-        }
-    }
-    ACB update_acb(const ACB &acb, Tick price, Lot amount, Side side, double fee) const {
-        if (inverted) {
-            return acb.execution(1.0/tick2price(price), -static_cast<double>(side)*lot2amount(amount), fee);
-        } else {
-            return acb.execution(tick2price(price), static_cast<double>(side)*lot2amount(amount), fee);
-        }
-    }
-
-    double acb_get_open(const ACB &acb) {
-        if (inverted) return 1.0/acb.getOpen(); else return acb.getOpen();
-    }
-    double acb_get_position(const ACB &acb) {
-        if (inverted) return -acb.getPos(); else return acb.getPos();
-    }
-    double acb_get_upnl(const ACB &acb, Tick price) {
-        double p = inverted?1.0/tick2price(price):tick2price(price);
-        return acb.getUPnL(p);
+    template<unsigned int n>
+    auto lot2amount(const Lot (&arr)[n]) const {
+        return [&]<std::size_t... idx>(std::index_sequence<idx...>) {
+            return std::make_tuple(lot2amount(arr[idx]) ...);
+        }(std::make_index_sequence<n>());
     }
 
 };
@@ -121,7 +113,7 @@ struct PendingOrders {
 struct MarketState {
     //time of last update
     Time tp = {};
-    //contains revision of the market info
+    ///contains revision of the market info
     Revision market_rev = 0;
     PendingOrders pending_orders = {};
     Fills fills = {};
