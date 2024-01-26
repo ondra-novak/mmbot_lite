@@ -10,14 +10,14 @@ public:
     ReportingCSV(std::string ofile);
     ~ReportingCSV();
     virtual void rpt(const MarketInfo &minfo) override;
-    virtual void rpt(const StrategyResult &strategy_result) override;
+    virtual void rpt(const StrategyState &ss) override;
     virtual void rpt(const MarketCommand &mcmd) override;
     virtual void rpt(const MarketState &state) override;
     virtual void rpt(const TraderReport &trpt) override;
 
 protected:
     MarketInfo nfo;
-    StrategyResult sr;
+    StrategyState sr;
     MarketState state;
     TraderReport trpt;
 

@@ -18,9 +18,9 @@ void Trader::start() {
     const MarketState &st = market->get_state();
     rpt->rpt(st);
     auto &ss = process_state(st);
+    ss.last_exec_price = ss.current_price;
     spread->start(ss.current_price);
     strategy->start(ss);
-    execute_state(ss, st);
 }
 
 void Trader::step() {
@@ -37,6 +37,9 @@ void Trader::step() {
         auto &ss = process_state(st);
         strategy->event(ss);
         execute_state(ss, st);
+        rpt->rpt(st);
+        rpt->rpt(ss);
+        rpt->rpt(rpt_data);
         return;
     }
     throw std::runtime_error("Failed to update market information consistently (revision mistmatch)");
@@ -49,7 +52,6 @@ StrategyState &Trader::process_state(const MarketState &state) {
     ss.min_size = std::max(minfo.lot2amount(minfo.min_size), minfo.min_volume/ss.current_price);
     ss.leverage = minfo.leverage;
 
-    auto [bid,ask] = minfo.tick2price({state.bid, state.ask});
 
     if (!state.fills.empty()) {
         ACB total_fill;
@@ -58,6 +60,7 @@ StrategyState &Trader::process_state(const MarketState &state) {
             double size = minfo.lot2amount(f.size) * static_cast<double>(f.side);
 
             total_fill = total_fill.execution(price, size, f.fee);
+            rpt_data.pnl = rpt_data.pnl.execution(price, size, f.fee);
         }
         double fill_price = total_fill.getOpen();
         double fees = total_fill.getRPnL();
@@ -114,9 +117,10 @@ StrategyState &Trader::process_state(const MarketState &state) {
 void Trader::execute_state(const StrategyState &st, const MarketState &state) {
     MarketCommand cmd;
     alert_buy = alert_sell = 0;
+
     if (st.buy.has_value()) {
         Tick tick =  minfo.price2tick(st.buy->price / (1+minfo.pct_fee));
-        Lot lot = minfo.lot2amount(st.buy->size);
+        Lot lot = minfo.amount2lot(st.buy->size);
         if (tick >= state.ask) tick = state.ask-1;
         if (lot) {
             cmd.buy.emplace(MarketCommand::Order{tick,lot,true});
@@ -126,7 +130,7 @@ void Trader::execute_state(const StrategyState &st, const MarketState &state) {
     }
     if (st.sell.has_value()) {
         Tick tick =  minfo.price2tick(st.sell->price / (1-minfo.pct_fee));
-        Lot lot = minfo.lot2amount(st.sell->size);
+        Lot lot = minfo.amount2lot(st.sell->size);
         if (tick <= state.bid) tick = state.bid-1;
         if (lot) {
             cmd.sell.emplace(MarketCommand::Order{tick,lot,true});

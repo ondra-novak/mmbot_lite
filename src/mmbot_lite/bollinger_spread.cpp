@@ -3,6 +3,7 @@
 namespace mmbot {
 
 BBSpread::BBSpread(Config cfg):BBSpread(init(cfg)) {
+
 }
 
 BBSpread BBSpread::init(const Config &cfg) {
@@ -20,6 +21,8 @@ BBSpread BBSpread::init(const Config &cfg) {
     }
 
     if (cfg.zero_level) c.push_back(0.0);
+
+
     std::sort(c.begin(), c.end());
     return BBSpread(std::move(c), EMStDev(cfg.mean_points, cfg.stdev_points), std::max(cfg.mean_points, cfg.stdev_points));
 
@@ -98,6 +101,39 @@ void BBSpread::start(double y) {
     _sell_curve = &_curves.back();
 }
 
+BBSpread::Iter BBSpread::next_buy(Iter x) const {
+    if (x == &_curves.back()) return x;
+    auto a = x;
+    ++a;
+    if (a == _disabled_curve) {
+        if (a == &_curves.back()) return x;
+        ++a;
+    }
+    return a;
+}
+
+BBSpread::Iter BBSpread::next_sell(Iter x) const {
+    if (x == &_curves.front()) return x;
+    auto a = x;
+    --a;
+    if (a == _disabled_curve) {
+        if (a == &_curves.front()) return x;
+        --a;
+    }
+    return a;
+}
+
+bool BBSpread::below(Iter x) const {
+    return x < &_curves.front();
+}
+
+bool BBSpread::above(Iter x) const {
+    return x > &_curves.back();
+}
+
+BBSpread* BBSpread::clone() const {
+    return new BBSpread(*this);
+}
 
 
 

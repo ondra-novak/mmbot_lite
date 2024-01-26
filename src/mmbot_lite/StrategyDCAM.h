@@ -12,8 +12,10 @@ public:
         double power; //w
         double multiplier; //c
         double initial_budget; //p
-        double yield_multipler; //multiplies default yield
-        double yield_max_spread; //specifies spread limitation, so if there is wider spread, this limit is used
+        double initial_spread_yield_f;
+        double spread_yield_f;
+        double max_spread_yield_f;
+        double shift;
         double max_leverage; //currently not used
     };
 
@@ -36,27 +38,27 @@ protected:
 //    double get_mc() const;
     static int get_side(double pos);
 
-    static constexpr double calc_position(double p, double w, double k, double c, double x);
-    static constexpr double calc_value(double p, double w, double k, double c, double x);
-    static constexpr double find_price_from_pos(double p, double w, double k, double c, double x);
+    static double calc_position(double p, double w, double k, double c, double x);
+    static double calc_value(double p, double w, double k, double c, double x);
+    static double find_price_from_pos(double p, double w, double k, double c, double x);
 
-    static constexpr double find_k(double w, double c, double p, double price, double val, double pos);
-    static constexpr double find_k_from_pos(double w, double c, double p, double price, double pos);
+    static double find_k(double w, double c, double p, double price, double val, double pos);
+    static double find_k_from_pos(double w, double c, double p, double price, double pos);
 
-    static constexpr double calc_position(const Config &cfg, double k, double x) {
+    static double calc_position(const Config &cfg, double k, double x) {
         return calc_position(cfg.initial_budget, cfg.power, k, cfg.multiplier, x);
     }
-    static constexpr double calc_value(const Config &cfg, double k, double x) {
+    static double calc_value(const Config &cfg, double k, double x) {
         return calc_value(cfg.initial_budget, cfg.power, k, cfg.multiplier, x);
     }
-    static constexpr double find_price_from_pos(const Config &cfg, double k, double x) {
+    static double find_price_from_pos(const Config &cfg, double k, double x) {
         return find_price_from_pos(cfg.initial_budget, cfg.power, k, cfg.multiplier, x);
     }
 
-    static constexpr double find_k(const Config &cfg, double price, double val, double pos) {
+    static double find_k(const Config &cfg, double price, double val, double pos) {
         return find_k(cfg.power, cfg.multiplier, cfg.initial_budget, price, val, pos);
     }
-    static constexpr double find_k_from_pos(const Config &cfg, double price, double pos) {
+    static double find_k_from_pos(const Config &cfg, double price, double pos) {
         return find_k_from_pos(cfg.power, cfg.multiplier, cfg.initial_budget, price, pos);
     }
 

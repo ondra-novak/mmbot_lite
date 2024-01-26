@@ -11,7 +11,7 @@ ReportingCSV::ReportingCSV(std::string ofile) {
     if (!output) throw std::runtime_error("Failed to open report for writing");
     output << "time,bid,ask,equity,open_price,position,fill_price,fill_size,fill_fee,"
              "buy_price,buy_size,sell_price,sell_size,"
-            "allocated,neutral,loss,rpnl,upnl,cost,leverage" << std::endl;
+            "allocated,neutral,equi,rpnl" << std::endl;
 }
 
 
@@ -20,7 +20,7 @@ void ReportingCSV::rpt(const MarketInfo &minfo) {
     nfo = minfo;
 }
 
-void ReportingCSV::rpt(const StrategyResult &strategy_result) {
+void ReportingCSV::rpt(const StrategyState &strategy_result) {
     activate_section(strategy_output);
     sr = strategy_result;
 }
@@ -89,17 +89,16 @@ void ReportingCSV::add_to_report() {
         output << ",,,,,,,,,,,,";
     }
     if (strategy_output) {
-        output << "," << sr.allocate <<",";
-        output << sr.neutral_price;
-        output << "," << sr.loss;
+        output << "," << sr.allocation ;
+        output << "," << sr.neutral_price;
+        output << "," << sr.equilibrium;
     } else {
         output << ",,,";
     }
     if (trader_output) {
-        output << "," << trpt.rpnl << "," << trpt.rpnl+trpt.upnl
-                 << "," << trpt.suma << "," << trpt.suma/sr.allocate;
+        output << "," << trpt.pnl.getEquity(sr.current_price);
     } else {
-        output << ",,,,";
+        output << ",";
     }
     output << std::endl;
 }

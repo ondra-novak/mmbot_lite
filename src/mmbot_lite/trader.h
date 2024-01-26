@@ -52,6 +52,7 @@ protected:
     Tick alert_buy = 0;
     Tick alert_sell = 0;
 
+    TraderReport rpt_data;
 
     MarketCommand step(const MarketState &state);
 

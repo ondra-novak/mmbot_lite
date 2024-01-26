@@ -48,8 +48,10 @@ protected:
 
     static BBSpread init(const Config &cfg);
 
-    BBSpread(std::vector<double> c, EMStDev stdev, unsigned int min_period):_curves(c), _stdev(stdev),_min_period(min_period) {}
-    virtual ISpread* clone() const override;
+    BBSpread(std::vector<double> c, EMStDev stdev, unsigned int min_period):_curves(c), _stdev(stdev),_min_period(min_period) {
+        start(1.0);
+    }
+    virtual BBSpread* clone() const override;
 
     Iter next_buy(Iter x) const;
     Iter next_sell(Iter x) const;
