@@ -3,7 +3,6 @@
 #include "strategy.h"
 #include "spread.h"
 
-#include "acb.h"
 namespace mmbot {
 
 template<typename BaseFn>
@@ -22,18 +21,22 @@ public:
     virtual void start(StrategyState &state) override ;
     virtual void event(StrategyState &state) override ;
     virtual void store(PersistentStorage &storage) const override ;
-    virtual void restore(const PersistentStorage &storage) override ;
+    virtual bool restore(const PersistentStorage &storage) override ;
     virtual StrategyDCAM *clone() const override ;
 
 protected:
 
     Config _cfg;
     mutable BaseFn _baseFn;
-    bool _zero = true;
     double _val = 0;     //current value/loss
     double _k = 0;       //previous k value;
     double _p = 0;       //reference price
     double _pos = 0;
+
+    enum class Fld {
+        val, k, p, pos,
+
+    _count};
 
 
 //    double get_mc() const;

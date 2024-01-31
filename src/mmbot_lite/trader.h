@@ -2,11 +2,11 @@
 #include "market.h"
 
 #include "spread.h"
-
+#include "istorage.h"
 #include "strategy.h"
 #include "reporting.h"
 
-#include "acb.h"
+
 namespace mmbot {
 
 
@@ -44,6 +44,7 @@ protected:
     MarketInfo minfo;
     PStrategy strategy;
     StrategyState strategy_state;
+    PersistentStorage strategy_persistent_state;
     PSpread spread;
     PMarket market;
     PReport rpt;

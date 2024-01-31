@@ -1,5 +1,5 @@
 #include "StrategyDCAM.h"
-#include "numerics.h"
+#include "math/numerics.h"
 #include "market.h"
 
 #include <cmath>
@@ -99,10 +99,21 @@ void StrategyDCAM<BaseFn>::event(StrategyState &state) {
 
 template<typename BaseFn>
 void StrategyDCAM<BaseFn>::store(PersistentStorage &storage) const {
+    storage.set_count(Fld::_count);
+    storage[Fld::k] = _k;
+    storage[Fld::p] = _p;
+    storage[Fld::pos] = _pos;
+    storage[Fld::val] = _val;
 }
 
 template<typename BaseFn>
-void StrategyDCAM<BaseFn>::restore(const PersistentStorage &storage) {
+bool StrategyDCAM<BaseFn>::restore(const PersistentStorage &storage) {
+    if (!storage.has_count(Fld::_count)) return false;
+    _k = storage[Fld::k].template as<double>();
+    _p = storage[Fld::p].template as<double>();
+    _pos = storage[Fld::pos].template as<double>();
+    _val = storage[Fld::val].template as<double>();
+    return true;
 }
 
 template<typename BaseFn>
@@ -160,9 +171,6 @@ void StrategyDCAM<BaseFn>::create_orders(StrategyState &st) {
 
 
 
-static double calc_factor(double p,double w, double c) {
-    return p/(std::cosh(w*(1.0 - c))-1.0);
-}
 
 double FunctionSinH::fnx(double p, double w, double k, double c, double x) {
     return (w/k) * std::sinh(w * (1 - x/k)) * p * c/(w*w);

@@ -135,7 +135,8 @@ struct PersistentValue {
             case boolean: return fn(b_val);break;
             case integer: return fn(i_val);break;
             case floating: return fn(f_val);break;
-            case datetime: return fn(std::chrono::system_clock::time_point(t_val));break;
+            case datetime: return fn(std::chrono::system_clock::time_point(
+                    std::chrono::system_clock::duration(t_val)));break;
         }
     }
 
@@ -151,7 +152,38 @@ struct PersistentValue {
     }
 };
 
-using PersistentStorage = std::vector<PersistentValue>;
+template<typename T>
+concept Enumerator = std::is_enum_v<T>;
+
+class PersistentStorage : public std::vector<PersistentValue> {
+public:
+
+    template<Enumerator T>
+    PersistentValue &operator[](T v) {
+        return std::vector<PersistentValue>::operator [](static_cast<unsigned int>(v));
+    }
+    template<Enumerator T>
+    const PersistentValue &operator[](T v) const {
+        return std::vector<PersistentValue>::operator [](static_cast<unsigned int>(v));
+    }
+
+    template<typename T, Enumerator ... Args>
+    auto as(Args ... items) const {
+        return std::make_tuple(std::vector<PersistentValue>::operator [](static_cast<unsigned int>(items)).as<T>()...);
+    }
+
+    template<Enumerator T>
+    void set_count(T count_value) {
+        std::vector<PersistentValue>::resize(static_cast<unsigned int>(count_value));
+    }
+    template<Enumerator T>
+    bool has_count(T count_value) const {
+        return std::vector<PersistentValue>::size() >= static_cast<unsigned int>(count_value);
+    }
+
+};
+
+
 
 ///UserStateField is state field, which is presented to the user
 /**
@@ -190,7 +222,7 @@ public:
     ///store state of the strategy into persistent storage
     virtual void store(PersistentStorage &storage) const = 0;
     ///restore state of the strategy - it is called instead start()
-    virtual void restore(const PersistentStorage &storage) = 0;
+    virtual bool restore(const PersistentStorage &storage) = 0;
 
     virtual IStrategy *clone() const = 0;
 

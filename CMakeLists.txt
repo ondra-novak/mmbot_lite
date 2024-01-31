@@ -9,6 +9,8 @@ else()
 	set(STANDARD_LIBRARIES "pthread")
 endif()
 
+include_directories(BEFORE src/json20/src)
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/ CACHE STRING "Output directory")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/ CACHE STRING "Library directory")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/ CACHE STRING "Archive directory")
