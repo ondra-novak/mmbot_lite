@@ -1,3 +1,6 @@
 [submodule "src/json20"]
 	path = src/json20
 	url = https://github.com/ondra-novak/json20.git
+[submodule "src/docdb"]
+	path = src/docdb
+	url = https://github.com/ondra-novak/docdb.git

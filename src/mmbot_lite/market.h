@@ -15,21 +15,46 @@ using Tick = long;
 using Lot = long;
 using Revision = unsigned long;
 
+using OrderID = std::string;
 
+struct PendingOrder {
+    OrderID id;
+    Tick price;
+    Lot size;
+};
+
+using FillID = std::string;
+using Time = std::chrono::system_clock::time_point;
 
 enum class Side: int {
     buy = 1,
     sell = -1
 };
 
+struct Fill {
+    FillID id;
+    Time tp;
+    Tick price;
+    Lot size;
+    Side side;
+    float fee;
+    float tick_size;    //tick size in time of execution to reconstruct price
+    float lot_size;     //lot size in time of execution to reconstruct size
+
+    template<typename Me, typename Arch>
+    static auto serialize(Me &me, Arch &arch) {
+        return arch(me.id, me.tp, me.price, me.size, me.side, me.fee, me.tick_size, me.lot_size);
+    }
+};
+
 struct MarketInfo {
     //revision of this information. If revision changes, you know, that you need to update info
     Revision rev;
-    double tick_size;
-    double lot_size;
-    double leverage;
-    double min_volume;
-    double pct_fee;
+    float tick_size;
+    float lot_size;
+    float leverage;
+    float min_volume;
+    float pct_fee;
     Lot min_size;
 
 
@@ -82,26 +107,6 @@ struct MarketInfo {
 
 };
 
-using OrderID = std::string;
-
-struct PendingOrder {
-    OrderID id;
-    Tick price;
-    Lot size;
-};
-
-using FillID = std::string;
-using Time = std::chrono::system_clock::time_point;
-
-struct Fill {
-    FillID id;
-    Time tp;
-    Tick price;
-    Lot size;
-    Side side;
-    double fee;
-};
-
 using Fills = std::vector<Fill>;
 
 struct PendingOrders {
@@ -124,7 +129,7 @@ struct MarketState {
     double open_price = 0;
 };
 
-using TraderID = std::string;
+using TraderID = std::uint64_t;
 
 struct MarketCommand {
 

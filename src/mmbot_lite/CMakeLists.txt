@@ -9,4 +9,7 @@ add_executable(backtest
      StrategyDCAM.cpp
      trader.cpp
      reporting_csv.cpp
+     database.cpp
 )
+
+target_link_libraries(backtest leveldb)
