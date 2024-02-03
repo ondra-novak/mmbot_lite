@@ -10,6 +10,9 @@ add_executable(backtest
      trader.cpp
      reporting_csv.cpp
      database.cpp
+     strategy_config.cpp
+     types/formdef.cpp
+     broker_config.cpp
 )
-
+    
 target_link_libraries(backtest leveldb)

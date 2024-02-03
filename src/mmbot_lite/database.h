@@ -15,7 +15,8 @@ static_assert(docdb::IsSerializableMethod<Fill , docdb::ToBinarySerializer<char 
 class DatabaseCntr {
 public:
 
-
+    using Fill = IStorage::Fill;
+    using Fills = std::vector<Fill>;
 
 
 
@@ -36,8 +37,9 @@ public:
     Fills read_fills(TraderID id) const;
 
     void store_strategy_state(TraderID id, const PersistentStorage &store);
-
     PersistentStorage read_strategy_state(TraderID id);
+    void store_market_state(TraderID id, const PersistentStorage &store);
+    PersistentStorage read_market_state(TraderID id);
 
     std::unique_ptr<IStorage> create_storage(TraderID id, MarketID market, SymbolID symbol);
 
@@ -47,6 +49,7 @@ protected:
     docdb::Map<docdb::RowDocument> _tickers;
     docdb::Map<docdb::SerializingDocument<Fill> > _fills;
     docdb::Map<docdb::SerializingDocument<PersistentStorage> > _strategy_state;
+    docdb::Map<docdb::SerializingDocument<PersistentStorage> > _market_state;
 
 
 };

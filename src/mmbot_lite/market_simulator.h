@@ -1,6 +1,6 @@
 #pragma once
 #include "market.h"
-
+#include "market_account.h"
 
 #include <cstdint>
 
@@ -20,10 +20,12 @@ public:
 
     virtual const MarketState &get_state() override;
     virtual void execute(const MarketCommand &command) override;
-    virtual void restore_state(std::string_view state) override;
-    virtual std::string save_state() const override;
+    virtual void restore(const PersistentStorage &state) override;
+    virtual void store(PersistentStorage &state) const override;
     virtual const MarketInfo &get_info() override;
     virtual SourceData fetch_source() = 0;
+
+    virtual std::shared_ptr<IMarketAccount> get_account() const {return nullptr;}
 
 protected:
     MarketInfo nfo;
@@ -37,6 +39,12 @@ protected:
     void add_fill(PendingOrder &ord, const Time &tm);
 
 
+    enum class Field {
+        position,
+        balance,
+        open_price,
+        id_counter,
+    _count};
 
 
 

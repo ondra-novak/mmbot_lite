@@ -6,7 +6,7 @@
 namespace mmbot {
 
 //smallest value - default count of steps of find_root is 32, so smallest unit is aprx 1e-10
-constexpr double epsilon = 1.0/std::exp(32);
+constexpr double epsilon = 1e-14;
 
 template<typename BaseFn>
 StrategyDCAM<BaseFn> *StrategyDCAM<BaseFn>::clone() const {

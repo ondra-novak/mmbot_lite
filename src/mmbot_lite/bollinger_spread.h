@@ -57,10 +57,9 @@ protected:
     Iter next_sell(Iter x) const;
     bool below(Iter x) const;
     bool above(Iter x) const;
-
-
-
 };
+
+
 
 
 }

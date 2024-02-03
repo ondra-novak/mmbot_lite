@@ -17,6 +17,8 @@ public:
     MarketSimulatorReadFile (const MarketInfo &info, std::istream &stream, double equity);
     virtual AbstractMarketSimulator::SourceData fetch_source() override;
 
+
+
 protected:
     std::istream &stream;
     std::chrono::system_clock::time_point tp;

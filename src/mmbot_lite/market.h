@@ -1,12 +1,16 @@
 #pragma once
 
+#include "math/acb.h"
+#include "types/persistent_storage.h"
+
+
 #include <string>
 #include <chrono>
 #include <cmath>
+#include <memory>
 #include <optional>
 #include <vector>
 
-#include "math/acb.h"
 
 #include <tuple>
 namespace mmbot {
@@ -56,6 +60,14 @@ struct MarketInfo {
     float min_volume;
     float pct_fee;
     Lot min_size;
+    //name of symbol
+    std::string_view symbol_name = {};
+    //name of position (currency of position)
+    std::string_view position_currency_name = {};
+    //equity currency name (currency of equity)
+    std::string_view equity_currency_name = {};
+    //quote currency name
+    std::string_view quote_currency_name = {};
 
 
     constexpr Tick price2tick(double price) const {
@@ -147,25 +159,25 @@ struct MarketCommand {
 };
 
 
+class IMarketAccount;
+
 class IMarket {
 public:
 
     virtual ~IMarket() = default;
 
-    ///restore saved state
-    ///
-    virtual void restore_state(std::string_view state) = 0;
-    ///save state
-    /** Allows to store state of this object inside of trader's state
-     * This preserves state between restarts etcs
-     * */
-    virtual std::string save_state() const = 0;
+    virtual void restore(const PersistentStorage &state) = 0;
+    virtual void store(PersistentStorage &state) const = 0;
+
     ///get market info
     virtual const MarketInfo &get_info() = 0;
     ///get market state
     virtual const MarketState &get_state()= 0;
     virtual void execute(const MarketCommand &command) = 0;
+
+    virtual std::shared_ptr<IMarketAccount> get_account() const = 0;
 };
+
 
 
 }

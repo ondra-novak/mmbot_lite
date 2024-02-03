@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdlib>
 
 ///Calculates UPnL and RPnL based on trades
 /**

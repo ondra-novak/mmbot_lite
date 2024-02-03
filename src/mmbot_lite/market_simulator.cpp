@@ -20,28 +20,22 @@ void AbstractMarketSimulator::add_fill(PendingOrder &ord, const Time &tm) {
     fills.push_back(Fill{get_id(),tm,ord.price, ord.size,side, fees, nfo.tick_size, nfo.lot_size});
 }
 
-
-
-
-std::string AbstractMarketSimulator::save_state() const {
-    std::ostringstream s;
-    s << state.position << " " << acb.getRPnL() << " " << acb.getPos() << " " << acb.getSuma() << " " << id_counter;
-    return s.str();
-}
-
-void AbstractMarketSimulator::restore_state(std::string_view state) {
-    std::istringstream s((std::string(state)));
-    double rpnl;
-    double pos;
-    double sum;
-
-    s >> this->state.position >> rpnl >> pos >> sum >> this->id_counter;
-    if (pos) {
-        acb = ACB(sum/pos, pos, rpnl);
-    } else {
-        acb = ACB(0,0,rpnl);
+void AbstractMarketSimulator::restore(const PersistentStorage &st) {
+    if (st.has_count(Field::_count)) {
+        state.position = st[Field::position].as<Lot>();
+        acb = ACB(st[Field::open_price].as<double>(), state.position, st[Field::balance].as<double>());
+        id_counter = st[Field::id_counter].as<std::uint64_t>();
     }
-    this->state.equity = acb.getRPnL();
+
+
+
+}
+void AbstractMarketSimulator::store(PersistentStorage &st) const {
+    st.set_count(Field::_count);
+    st[Field::position] = state.position;
+    st[Field::balance] = acb.getRPnL();
+    st[Field::open_price] = acb.getOpen();
+    st[Field::id_counter] = id_counter;
 }
 
 const MarketState& AbstractMarketSimulator::get_state()  {

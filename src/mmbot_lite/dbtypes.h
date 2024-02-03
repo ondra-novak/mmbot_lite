@@ -14,7 +14,7 @@ using MinuteID = std::uint32_t;
 using TickerKey = docdb::FixedKey<MarketID, SymbolID, MinuteID>;
 using TickerValue = docdb::FixedRow<double, double>;
 
-using FillKey = docdb::FixedKey<TraderID, Time, FillID>;
+using FillKey = docdb::FixedKey<TraderID, Time>;
 
 
 

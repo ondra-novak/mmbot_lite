@@ -1,5 +1,6 @@
 #include "bollinger_spread.h"
 
+#include <algorithm>
 namespace mmbot {
 
 BBSpread::BBSpread(Config cfg):BBSpread(init(cfg)) {

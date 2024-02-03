@@ -8,6 +8,7 @@ DatabaseCntr::DatabaseCntr(docdb::PDatabase db)
         ,_tickers(db, "tickers")
         ,_fills(db, "fills")
         ,_strategy_state(db, "strategy_state")
+        ,_market_state(db, "market_state")
 
         {
 }
@@ -44,10 +45,10 @@ void DatabaseCntr::store_ticker(MarketID market, SymbolID symbol,
 }
 
 void DatabaseCntr::store_fill(TraderID id, const Fill &fill) {
-    _fills.put(FillKey(id, fill.tp, fill.id), fill);
+    _fills.put(FillKey(id, fill.tm), fill);
 }
 
-Fills DatabaseCntr::read_fills(TraderID id) const {
+DatabaseCntr::Fills DatabaseCntr::read_fills(TraderID id) const {
     Fills out;
     for (const auto &rc: _fills.select({id})) {
         out.push_back(rc.value);
@@ -69,6 +70,19 @@ void DatabaseCntr::store_strategy_state(TraderID id,
     _strategy_state.put({id}, store);
 }
 
+PersistentStorage DatabaseCntr::read_market_state(TraderID id) {
+    PersistentStorage stor;
+    auto res = _market_state.find({id});
+    if (res.has_value()) {
+        stor = std::move(*res);
+    }
+    return stor;
+}
+
+void DatabaseCntr::store_market_state(TraderID id, const PersistentStorage &store) {
+    _market_state.put({id}, store);
+}
+
 class Storage : public IStorage{
 public:
     DatabaseCntr &cntr;
@@ -82,9 +96,10 @@ public:
             std::size_t count) const override;
     virtual Fills read_fills() const override;
     virtual void store_ticker(const IStorage::Ticker &ticker) override;
-    virtual void store_strategy_state(
-            const PersistentStorage &strategy_state) override;
+    virtual void store_strategy_state(const PersistentStorage &strategy_state) override;
+    virtual void store_market_state(const PersistentStorage &market_state) override;
     virtual PersistentStorage restore_strategy_state() const override;
+    virtual PersistentStorage restore_market_state() const override;
 
     Storage(DatabaseCntr &cntr, TraderID id, MarketID market, SymbolID symbol)
         :cntr(cntr),id(id),market(market),symbol(symbol) {}
@@ -94,8 +109,6 @@ public:
 std::unique_ptr<IStorage> DatabaseCntr::create_storage(TraderID id, MarketID market, SymbolID symbol) {
     return std::make_unique<Storage>(*this, id, market, symbol);
 }
-
-
 
 void Storage::store_fill(const Fill &fill) {
     cntr.store_fill(id, fill);
@@ -109,7 +122,7 @@ std::vector<IStorage::Ticker,
     return cntr.read_history(market, symbol, start, count);
 }
 
-Fills mmbot::Storage::read_fills() const {
+Storage::Fills Storage::read_fills() const {
     return cntr.read_fills(id);
 }
 
@@ -125,6 +138,15 @@ void Storage::store_strategy_state(
 
 PersistentStorage Storage::restore_strategy_state() const {
     return cntr.read_strategy_state(id);
+}
+
+void Storage::store_market_state(
+        const PersistentStorage &market_state) {
+    cntr.store_market_state(id, market_state);
+}
+
+PersistentStorage Storage::restore_market_state() const {
+    return cntr.read_market_state(id);
 }
 
 }

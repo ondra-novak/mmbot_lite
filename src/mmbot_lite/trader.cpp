@@ -3,10 +3,11 @@
 #include "bollinger_spread.h"
 namespace mmbot {
 
-Trader::Trader(Config cfg, PMarket market, PReport rpt)
+Trader::Trader(Config cfg, PMarket market, PStorage storage, PReport rpt)
             :strategy(std::move(cfg.strategy))
             ,spread(std::move(cfg.spread))
             ,market(std::move(market))
+            ,storage(std::move(storage))
             ,rpt(std::move(rpt))
 {
 
@@ -15,12 +16,32 @@ Trader::Trader(Config cfg, PMarket market, PReport rpt)
 void Trader::start() {
     minfo = market->get_info();
     rpt->rpt(minfo);
-    const MarketState &st = market->get_state();
-    rpt->rpt(st);
-    auto &ss = process_state(st);
-    ss.last_exec_price = ss.current_price;
-    spread->start(ss.current_price);
-    strategy->start(ss);
+
+    bool strategy_ok = false;
+    bool spread_ok = false;
+
+    if (storage) {
+        auto fills = storage->read_fills();
+        auto history = storage->read_history(spread->get_min_point_count()*2);
+        spread_ok = restore_trader_state(fills, history);
+        strategy_persistent_state = storage->restore_strategy_state();
+        strategy_ok = strategy->restore(strategy_persistent_state);
+    }
+
+    if (!strategy_ok || !spread_ok) {
+        const MarketState &st = market->get_state();
+        rpt->rpt(st);
+        auto &ss = process_state(st);
+        ss.last_exec_price = ss.current_price;
+        if (!spread_ok) {
+            spread->start(ss.current_price);
+        }
+        if (!strategy_ok) {
+            ss.buy.reset();
+            ss.sell.reset();
+            strategy->start(ss);
+        }
+    }
 }
 
 void Trader::step() {
@@ -47,17 +68,24 @@ void Trader::step() {
 
 StrategyState &Trader::process_state(const MarketState &state) {
     StrategyState &ss = strategy_state;
+    auto [bid,ask] = minfo.tick2price({state.bid, state.ask});
+
+    if (storage) storage->store_ticker({state.tp, bid, ask});
+
     ss.current_time = state.tp;
-    ss.current_price = minfo.tick2price((state.ask+state.bid)/2);
+    ss.current_price = (bid + ask)*0.5;
     ss.min_size = std::max(minfo.lot2amount(minfo.min_size), minfo.min_volume/ss.current_price);
     ss.leverage = minfo.leverage;
 
 
+
     if (!state.fills.empty()) {
         ACB total_fill;
+        Time last_tm;
         for (const Fill &f: state.fills) {
             double price = minfo.tick2price(f.price);
             double size = minfo.lot2amount(f.size) * static_cast<double>(f.side);
+            last_tm = f.tp;
 
             total_fill = total_fill.execution(price, size, f.fee);
             rpt_data.pnl = rpt_data.pnl.execution(price, size, f.fee);
@@ -72,6 +100,9 @@ StrategyState &Trader::process_state(const MarketState &state) {
         ss.last_exec_change = fill_size;
         ss.position += fill_size;
         ss.execution = true;
+
+        if (storage) storage->store_fill({last_tm, fill_price, fill_size, fees});
+
     } else {
         ss.execution = false;
         if (alert_sell && state.bid > alert_sell) {
@@ -79,11 +110,13 @@ StrategyState &Trader::process_state(const MarketState &state) {
             ss.last_exec_price = aprice;
             ss.alert = true;
             alert_sell = 0;
+            if (storage) storage->store_fill({state.tp, aprice, 0, 0});
         } else if (state.ask < alert_buy) {
             double aprice = minfo.tick2price(alert_buy);
             ss.last_exec_price = aprice;
             ss.alert = true;
             alert_buy = 0;
+            if (storage) storage->store_fill({state.tp, aprice, 0, 0});
         } else {
             ss.alert = false;
         }
@@ -152,6 +185,28 @@ void Trader::execute_state(const StrategyState &st, const MarketState &state) {
     }
     cmd.allocate = st.allocation;
     market->execute(cmd);
+}
+
+bool Trader::restore_trader_state(const IStorage::Fills &fills,
+        const IStorage::History &history) {
+
+    ACB st;
+    for (const auto &f: fills) {
+        st = st.execution(f.avg_price, f.size, f.fee);
+    }
+    rpt_data.pnl = st;
+    if (history.empty()) return false;
+    spread->start(history[0].price());
+    auto iter = fills.begin();
+    while (iter != fills.end() && iter->tm <= history[0].tm) ++iter;
+    for (const auto &t: history) {
+        while (iter != fills.end() && iter->tm <= t.tm) {
+            spread->execution(iter->avg_price);
+            ++iter;
+        }
+        spread->point(t.price());
+    }
+    return true;
 }
 
 }

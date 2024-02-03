@@ -17,6 +17,7 @@ public:
     using PSpread = clone_ptr<ISpread>;
     using PReport = std::unique_ptr<IReport>;
     using PStrategy = clone_ptr<IStrategy>;
+    using PStorage = std::unique_ptr<IStorage>;
 
 
     struct SpreadConfig {
@@ -33,7 +34,7 @@ public:
 
 
 
-    Trader(Config cfg, PMarket market, PReport rpt);
+    Trader(Config cfg, PMarket market, PStorage storage, PReport rpt);
 
     void start();
     void step();
@@ -47,6 +48,7 @@ protected:
     PersistentStorage strategy_persistent_state;
     PSpread spread;
     PMarket market;
+    PStorage storage;
     PReport rpt;
 
 
@@ -59,7 +61,7 @@ protected:
 
     StrategyState &process_state(const MarketState &state);
     void execute_state(const StrategyState &st, const MarketState &state);
-
+    bool restore_trader_state(const IStorage::Fills &fills, const IStorage::History &history);
 };
 
 

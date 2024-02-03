@@ -1,6 +1,7 @@
 #pragma once
 
 #include "spread.h"
+#include "types/persistent_storage.h"
 #include <chrono>
 #include <optional>
 #include <string_view>
@@ -101,114 +102,6 @@ public:
 
 };
 
-
-struct PersistentValue {
-
-
-    enum Type {
-        empty,
-        boolean,
-        integer,
-        floating,
-        datetime,
-    };
-
-    Type type;
-    union {
-        bool b_val;
-        int i_val;
-        double f_val;
-        std::int64_t t_val;
-    };
-
-    PersistentValue():type(empty) {}
-    PersistentValue(bool b):type(boolean),b_val(b) {}
-    PersistentValue(int v):type(integer),i_val(v) {}
-    PersistentValue(double v):type(floating),f_val(v) {}
-    PersistentValue(std::chrono::system_clock::time_point v):type(datetime),t_val(v.time_since_epoch().count()) {}
-
-    template<typename Fn>
-    auto visit(Fn &&fn) const {
-        switch (type) {
-            default:
-            case empty: return fn(nullptr);break;
-            case boolean: return fn(b_val);break;
-            case integer: return fn(i_val);break;
-            case floating: return fn(f_val);break;
-            case datetime: return fn(std::chrono::system_clock::time_point(
-                    std::chrono::system_clock::duration(t_val)));break;
-        }
-    }
-
-    template<typename T>
-    T as() const {
-        return visit([&](auto x) -> T {
-            if constexpr(std::is_constructible_v<T, decltype(x)>) {
-                return T(x);
-            } else {
-                return {};
-            }
-        });
-    }
-};
-
-template<typename T>
-concept Enumerator = std::is_enum_v<T>;
-
-class PersistentStorage : public std::vector<PersistentValue> {
-public:
-
-    template<Enumerator T>
-    PersistentValue &operator[](T v) {
-        return std::vector<PersistentValue>::operator [](static_cast<unsigned int>(v));
-    }
-    template<Enumerator T>
-    const PersistentValue &operator[](T v) const {
-        return std::vector<PersistentValue>::operator [](static_cast<unsigned int>(v));
-    }
-
-    template<typename T, Enumerator ... Args>
-    auto as(Args ... items) const {
-        return std::make_tuple(std::vector<PersistentValue>::operator [](static_cast<unsigned int>(items)).as<T>()...);
-    }
-
-    template<Enumerator T>
-    void set_count(T count_value) {
-        std::vector<PersistentValue>::resize(static_cast<unsigned int>(count_value));
-    }
-    template<Enumerator T>
-    bool has_count(T count_value) const {
-        return std::vector<PersistentValue>::size() >= static_cast<unsigned int>(count_value);
-    }
-
-};
-
-
-
-///UserStateField is state field, which is presented to the user
-/**
- * The strategy can convert values to be more informative for user
- */
-
-struct UserStateField{
-    enum Transform {
-        ///no transformation
-        normal,
-        ///enumeration
-        enumeration,
-        ///value is price (transform can be applied for inverse market)
-        price,
-        ///value is position (transform can be applied for inverse market)
-        position,
-
-    };
-    Transform transform;
-    PersistentValue value;
-    std::string_view name;
-    std::string_view values;
-};
-
-using UserState = std::vector<UserStateField>;
 
 class IStrategy {
 public:
