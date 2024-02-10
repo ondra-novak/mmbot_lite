@@ -1,12 +1,15 @@
 #pragma once
-#include <docdb/database.h>
-#include <docdb/map.h>
-
-
+#include "types/json_document.h"
 #include "market.h"
 #include "istorage.h"
 
 #include "dbtypes.h"
+
+#include <docdb/database.h>
+#include <docdb/map.h>
+
+
+
 namespace mmbot {
 
 
@@ -36,10 +39,9 @@ public:
 
     Fills read_fills(TraderID id) const;
 
-    void store_strategy_state(TraderID id, const PersistentStorage &store);
-    PersistentStorage read_strategy_state(TraderID id);
-    void store_market_state(TraderID id, const PersistentStorage &store);
-    PersistentStorage read_market_state(TraderID id);
+    void store_trader_state(TraderID id, const JsonValue &state) ;
+    JsonValue restore_trader_state(TraderID id) const ;
+
 
     std::unique_ptr<IStorage> create_storage(TraderID id, MarketID market, SymbolID symbol);
 
@@ -48,8 +50,7 @@ protected:
     docdb::PDatabase _db;
     docdb::Map<docdb::RowDocument> _tickers;
     docdb::Map<docdb::SerializingDocument<Fill> > _fills;
-    docdb::Map<docdb::SerializingDocument<PersistentStorage> > _strategy_state;
-    docdb::Map<docdb::SerializingDocument<PersistentStorage> > _market_state;
+    docdb::Map<JsonDocument> _trader_state;
 
 
 };

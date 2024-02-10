@@ -5,6 +5,7 @@
 #include "strategy.h"
 #include "istorage.h"
 #include <docdb/serializing_document.h>
+#include <docdb/key.h>
 namespace mmbot {
 
 
@@ -29,10 +30,6 @@ struct DBRecord {
     TraderID trader;
     Type type;
 
-    union {
-        PersistentStorage _strategy_state;
-        Fill _fill;
-    };
 
 
 

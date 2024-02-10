@@ -20,8 +20,8 @@ public:
 
     virtual const MarketState &get_state() override;
     virtual void execute(const MarketCommand &command) override;
-    virtual void restore(const PersistentStorage &state) override;
-    virtual void store(PersistentStorage &state) const override;
+    virtual void restore_state(const JsonValue &state) override;
+    virtual JsonValue store_state() const override;
     virtual const MarketInfo &get_info() override;
     virtual SourceData fetch_source() = 0;
 
@@ -39,12 +39,6 @@ protected:
     void add_fill(PendingOrder &ord, const Time &tm);
 
 
-    enum class Field {
-        position,
-        balance,
-        open_price,
-        id_counter,
-    _count};
 
 
 

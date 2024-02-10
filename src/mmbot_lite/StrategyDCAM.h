@@ -20,8 +20,8 @@ public:
     StrategyDCAM(const Config &cfg);
     virtual void start(StrategyState &state) override ;
     virtual void event(StrategyState &state) override ;
-    virtual void store(PersistentStorage &storage) const override ;
-    virtual bool restore(const PersistentStorage &storage) override ;
+    virtual JsonValue store_state() const override;
+    virtual bool restore_state(const JsonValue &state) override;
     virtual StrategyDCAM *clone() const override ;
 
 protected:
@@ -33,10 +33,6 @@ protected:
     double _p = 0;       //reference price
     double _pos = 0;
 
-    enum class Fld {
-        val, k, p, pos,
-
-    _count};
 
 
 //    double get_mc() const;

@@ -97,24 +97,29 @@ void StrategyDCAM<BaseFn>::event(StrategyState &state) {
     }
 }
 
-template<typename BaseFn>
-void StrategyDCAM<BaseFn>::store(PersistentStorage &storage) const {
-    storage.set_count(Fld::_count);
-    storage[Fld::k] = _k;
-    storage[Fld::p] = _p;
-    storage[Fld::pos] = _pos;
-    storage[Fld::val] = _val;
-}
 
 template<typename BaseFn>
-bool StrategyDCAM<BaseFn>::restore(const PersistentStorage &storage) {
-    if (!storage.has_count(Fld::_count)) return false;
-    _k = storage[Fld::k].template as<double>();
-    _p = storage[Fld::p].template as<double>();
-    _pos = storage[Fld::pos].template as<double>();
-    _val = storage[Fld::val].template as<double>();
-    return true;
+JsonValue StrategyDCAM<BaseFn>::store_state() const {
+    return {
+        {"neutral",_k},
+        {"price",_p},
+        {"pos",_pos},
+        {"val",_val}
+    };
 }
+template<typename BaseFn>
+bool StrategyDCAM<BaseFn>::restore_state(const JsonValue &st) {
+    if (st.size() == 4) {
+        _k = st["neutral"].get();
+        _p = st["price"].get();
+        _pos = st["pos"].get();
+        _val = st["val"].get();
+        return true;
+    } else  {
+        return false;
+    }
+}
+
 
 template<typename BaseFn>
 std::optional<double> StrategyDCAM<BaseFn>::calc_order(double price, double side) const {

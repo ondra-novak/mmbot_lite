@@ -45,7 +45,6 @@ protected:
     MarketInfo minfo;
     PStrategy strategy;
     StrategyState strategy_state;
-    PersistentStorage strategy_persistent_state;
     PSpread spread;
     PMarket market;
     PStorage storage;

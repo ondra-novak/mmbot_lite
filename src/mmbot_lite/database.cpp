@@ -7,8 +7,7 @@ DatabaseCntr::DatabaseCntr(docdb::PDatabase db)
         :_db(db)
         ,_tickers(db, "tickers")
         ,_fills(db, "fills")
-        ,_strategy_state(db, "strategy_state")
-        ,_market_state(db, "market_state")
+        ,_trader_state(db, "trader_state")
 
         {
 }
@@ -56,32 +55,18 @@ DatabaseCntr::Fills DatabaseCntr::read_fills(TraderID id) const {
     return out;
 }
 
-PersistentStorage DatabaseCntr::read_strategy_state(TraderID id) {
-    PersistentStorage stor;
-    auto res = _strategy_state.find({id});
+JsonValue DatabaseCntr::restore_trader_state(TraderID id) const {
+    auto res = _trader_state.find({id});
     if (res.has_value()) {
-        stor = std::move(*res);
+        return *res;
+    } else {
+        return {};
     }
-    return stor;
+}
+void DatabaseCntr::store_trader_state(TraderID id, const JsonValue &state) {
+    _trader_state.put({id}, state);
 }
 
-void DatabaseCntr::store_strategy_state(TraderID id,
-        const PersistentStorage &store) {
-    _strategy_state.put({id}, store);
-}
-
-PersistentStorage DatabaseCntr::read_market_state(TraderID id) {
-    PersistentStorage stor;
-    auto res = _market_state.find({id});
-    if (res.has_value()) {
-        stor = std::move(*res);
-    }
-    return stor;
-}
-
-void DatabaseCntr::store_market_state(TraderID id, const PersistentStorage &store) {
-    _market_state.put({id}, store);
-}
 
 class Storage : public IStorage{
 public:
@@ -96,10 +81,8 @@ public:
             std::size_t count) const override;
     virtual Fills read_fills() const override;
     virtual void store_ticker(const IStorage::Ticker &ticker) override;
-    virtual void store_strategy_state(const PersistentStorage &strategy_state) override;
-    virtual void store_market_state(const PersistentStorage &market_state) override;
-    virtual PersistentStorage restore_strategy_state() const override;
-    virtual PersistentStorage restore_market_state() const override;
+    virtual void store_trader_state(const JsonValue &state)  override;
+    virtual JsonValue restore_trader_state() const override;
 
     Storage(DatabaseCntr &cntr, TraderID id, MarketID market, SymbolID symbol)
         :cntr(cntr),id(id),market(market),symbol(symbol) {}
@@ -131,22 +114,11 @@ void Storage::store_ticker(
     cntr.store_ticker(market, symbol, ticker);
 }
 
-void Storage::store_strategy_state(
-        const PersistentStorage &strategy_state) {
-    cntr.store_strategy_state(id, strategy_state);
+void Storage::store_trader_state(const JsonValue &state) {
+    cntr.store_trader_state(id, state);
 }
-
-PersistentStorage Storage::restore_strategy_state() const {
-    return cntr.read_strategy_state(id);
-}
-
-void Storage::store_market_state(
-        const PersistentStorage &market_state) {
-    cntr.store_market_state(id, market_state);
-}
-
-PersistentStorage Storage::restore_market_state() const {
-    return cntr.read_market_state(id);
+JsonValue Storage::restore_trader_state() const {
+    return cntr.restore_trader_state(id);
 }
 
 }

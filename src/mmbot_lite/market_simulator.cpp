@@ -20,22 +20,19 @@ void AbstractMarketSimulator::add_fill(PendingOrder &ord, const Time &tm) {
     fills.push_back(Fill{get_id(),tm,ord.price, ord.size,side, fees, nfo.tick_size, nfo.lot_size});
 }
 
-void AbstractMarketSimulator::restore(const PersistentStorage &st) {
-    if (st.has_count(Field::_count)) {
-        state.position = st[Field::position].as<Lot>();
-        acb = ACB(st[Field::open_price].as<double>(), state.position, st[Field::balance].as<double>());
-        id_counter = st[Field::id_counter].as<std::uint64_t>();
-    }
-
-
-
+void AbstractMarketSimulator::restore_state(const JsonValue &st) {
+    state.position = st["pos"].get();
+    acb = ACB(st["open"].get(), state.position, st["balance"].get());
+    id_counter = st["id"].get();
 }
-void AbstractMarketSimulator::store(PersistentStorage &st) const {
-    st.set_count(Field::_count);
-    st[Field::position] = state.position;
-    st[Field::balance] = acb.getRPnL();
-    st[Field::open_price] = acb.getOpen();
-    st[Field::id_counter] = id_counter;
+JsonValue AbstractMarketSimulator::store_state() const {
+    return {
+        {"pos", state.position},
+        {"open", acb.getOpen()},
+        {"balance",acb.getRPnL()},
+        {"is", id_counter}
+    };
+
 }
 
 const MarketState& AbstractMarketSimulator::get_state()  {

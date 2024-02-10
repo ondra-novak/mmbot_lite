@@ -1,6 +1,5 @@
 #pragma once
 
-#include "persistent_storage.h"
 #include <string_view>
 #include <utility>
 #include <variant>
@@ -53,7 +52,7 @@ struct CntrEnum {
     json20::value_t to_json() const;
 };
 
-using ShowIfCond = std::vector<std::pair<std::string, std::vector<PersistentValue> > >;
+using ShowIfCond = std::vector<std::pair<std::string, std::vector<std::string> > >;
 
 struct CntrDef {
     std::string_view name;

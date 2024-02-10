@@ -1,5 +1,6 @@
 #pragma once
 
+#include "json.h"
 #include "clone_ptr.h"
 #include "formdef.h"
 
@@ -42,7 +43,7 @@ protected:
 
 
 template<typename Fn>
-class GenericFactoryImpl: public IGenericFactory<std::decay_t<std::invoke_result_t<Fn, json20::value_t> > > {
+class GenericFactoryImpl: public IGenericFactory<std::decay_t<std::invoke_result_t<Fn, JsonValue> > > {
 public:
 
     using RetVal = typename IGenericFactory<std::decay_t<std::invoke_result_t<Fn, json20::value_t> > >::RetVal;

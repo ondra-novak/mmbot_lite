@@ -58,13 +58,7 @@ json20::value_t CntrDef::to_json() const {
         {"show_if", show_if.empty()?json20::value_t()
                 :json20::value_t(show_if.begin(), show_if.end(), [](const auto &d)->json20::key_value_t{
             return {json20::value_t(d.first), json20::value_t(d.second.begin(),d.second.end(), [](const auto &e){
-                return e.visit([](const auto &x)->json20::value_t{
-                    if constexpr (std::is_convertible_v<decltype(x), json20::value_t>) {
-                        return x;
-                    } else {
-                        return {};
-                    }
-                });
+                return json20::value_t(e);
             })};
         })}
     });

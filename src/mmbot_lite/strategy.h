@@ -1,7 +1,7 @@
 #pragma once
 
+#include "types/json.h"
 #include "spread.h"
-#include "types/persistent_storage.h"
 #include <chrono>
 #include <optional>
 #include <string_view>
@@ -113,9 +113,9 @@ public:
     ///called every cycle (1 minute)
     virtual void event(StrategyState &state) = 0;
     ///store state of the strategy into persistent storage
-    virtual void store(PersistentStorage &storage) const = 0;
+    virtual JsonValue store_state() const = 0;
     ///restore state of the strategy - it is called instead start()
-    virtual bool restore(const PersistentStorage &storage) = 0;
+    virtual bool restore_state(const JsonValue &state) = 0;
 
     virtual IStrategy *clone() const = 0;
 

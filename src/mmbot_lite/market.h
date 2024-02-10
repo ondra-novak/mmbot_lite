@@ -1,7 +1,8 @@
 #pragma once
 
+#include "types/json.h"
 #include "math/acb.h"
-#include "types/persistent_storage.h"
+
 
 
 #include <string>
@@ -166,8 +167,9 @@ public:
 
     virtual ~IMarket() = default;
 
-    virtual void restore(const PersistentStorage &state) = 0;
-    virtual void store(PersistentStorage &state) const = 0;
+
+    virtual void restore_state(const JsonValue &state) = 0;
+    virtual JsonValue store_state() const = 0;
 
     ///get market info
     virtual const MarketInfo &get_info() = 0;

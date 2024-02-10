@@ -13,10 +13,10 @@ GenericFactoryImpl bbspread("bbspread",{
                 {"mean",CntrSlider{15,1,100,0.1,1}},
                 {"levels",CntrSlider{3,1,5}},
                 {"level0",CntrSlider{1,0.1,10,0.1,1}},
-                {"level1",CntrSlider{3,0.1,10,0.1,1},{{"levels",{2,3,4,5}}}},
-                {"level2",CntrSlider{5,0.1,10,0.1,1},{{"levels",{3,4,5}}}},
-                {"level3",CntrSlider{7,0.1,10,0.1,1},{{"levels",{4,5}}}},
-                {"level4",CntrSlider{10,0.1,10,0.1,1},{{"levels",{5}}}},
+                {"level1",CntrSlider{3,0.1,10,0.1,1},{{"levels",{"2","3","4","5"}}}},
+                {"level2",CntrSlider{5,0.1,10,0.1,1},{{"levels",{"3","4","5"}}}},
+                {"level3",CntrSlider{7,0.1,10,0.1,1},{{"levels",{"4","5"}}}},
+                {"level4",CntrSlider{10,0.1,10,0.1,1},{{"levels",{"5"}}}},
         }},
         {"advanced",{
                 {"dev",CntrLogSlider{100,10,1000,0.01,1}}

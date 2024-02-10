@@ -23,9 +23,12 @@ void Trader::start() {
     if (storage) {
         auto fills = storage->read_fills();
         auto history = storage->read_history(spread->get_min_point_count()*2);
+        auto state = storage->restore_trader_state();
         spread_ok = restore_trader_state(fills, history);
-        strategy_persistent_state = storage->restore_strategy_state();
-        strategy_ok = strategy->restore(strategy_persistent_state);
+        auto market_state = state["market"];
+        auto strategy_state = state["strategy"];
+        if (market_state) market->restore_state(market_state);
+        if (strategy_state) strategy_ok = strategy->restore_state(strategy_state);
     }
 
     if (!strategy_ok || !spread_ok) {
@@ -61,6 +64,12 @@ void Trader::step() {
         rpt->rpt(st);
         rpt->rpt(ss);
         rpt->rpt(rpt_data);
+        if (storage) {
+            storage->store_trader_state({
+                {"market", market->store_state()},
+                {"strategy", strategy->store_state()}
+            });
+        }
         return;
     }
     throw std::runtime_error("Failed to update market information consistently (revision mistmatch)");
